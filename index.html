@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpha Research - 金融资产研究平台</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 React 和 ReactDOM (生产版本) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- 引入 Babel 用于解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* 自定义滚动条动画 */
+        @keyframes marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .animate-marquee {
+            animation: marquee 25s linear infinite;
+        }
+        .animate-marquee:hover {
+            animation-play-state: paused;
+        }
+        /* 文本截断辅助类 */
+        .line-clamp-2 {
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+        }
+        .line-clamp-3 {
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 3;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+    
+        // --- Worker URL ---
+        const WORKER_URL = "https://quant-fusion-pro.w2632046629.workers.dev";
+        // ------------------
+    
+        // --- 图标组件 (略，保持不变) ---
+        const IconWrapper = ({ children, className, ...props }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="24" 
+                height="24" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className} 
+                {...props}
+            >
+                {children}
+            </svg>
+        );
+    
+        const BarChart3 = (props) => <IconWrapper {...props}><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></IconWrapper>;
+        const TrendingUp = (props) => <IconWrapper {...props}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></IconWrapper>;
+        const Globe = (props) => <IconWrapper {...props}><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></IconWrapper>;
+        const Search = (props) => <IconWrapper {...props}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></IconWrapper>;
+        const Menu = (props) => <IconWrapper {...props}><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></IconWrapper>;
+        const X = (props) => <IconWrapper {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></IconWrapper>;
+        const ArrowUpRight = (props) => <IconWrapper {...props}><path d="M7 7h10v10"/><path d="M7 17 17 7"/></IconWrapper>;
+        const ArrowDownRight = (props) => <IconWrapper {...props}><path d="m7 7 10 10"/><path d="M17 7v10H7"/></IconWrapper>;
+        const ChevronRight = (props) => <IconWrapper {...props}><path d="m9 18 6-6-6-6"/></IconWrapper>;
+        const FileText = (props) => <IconWrapper {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></IconWrapper>;
+        const Clock = (props) => <IconWrapper {...props}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></IconWrapper>;
+        const Mail = (props) => <IconWrapper {...props}><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></IconWrapper>;
+        const Linkedin = (props) => <IconWrapper {...props}><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect width="4" height="12" x="2" y="9"/><circle cx="4" cy="4" r="2"/></IconWrapper>;
+        const Twitter = (props) => <IconWrapper {...props}><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></IconWrapper>;
+        const Bot = (props) => <IconWrapper {...props}><path d="M12 8V4H8"/><path d="m5 24 1 5"/><path d="m14 24 1 5"/><path d="M12 24 12 20"/><path d="M18 10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2z"/></IconWrapper>;
+        const Send = (props) => <IconWrapper {...props}><path d="m22 2-7 20-4-9-9-4 20-7z"/><path d="M15 7l-6 6"/></IconWrapper>;
+    
+    
+        // --- 数据部分 (保持不变) ---
+        const marketData = [
+            { name: '现货黄金', value: '2,624.50', change: '+0.45%', isUp: true },
+            { name: '上证指数', value: '3,050.12', change: '-0.21%', isUp: false },
+            { name: '标普500', value: '5,230.10', change: '+0.89%', isUp: true },
+            { name: '恒生指数', value: '17,800.50', change: '+1.12%', isUp: true },
+            { name: '布伦特原油', value: '82.40', change: '-0.50%', isUp: false },
+            { name: '美元指数', value: '104.30', change: '+0.15%', isUp: true },
+            { name: 'BTC/USD', value: '64,200', change: '+2.10%', isUp: true },
+        ];
+    
+        const researchReports = [
+            {
+                id: 1,
+                title: '黄金市场深度解析：通胀预期下的避险选择',
+                category: 'gold',
+                categoryName: '黄金/贵金属',
+                summary: '在美联储降息预期波动的背景下，黄金作为避险资产的吸引力持续增强。本文分析了各国央行购金趋势及技术面支撑位。',
+                date: '2025-11-19',
+                author: '高级分析师 李明',
+                views: 1240
+            },
+            {
+                id: 2,
+                title: '股债跷跷板效应解读：2025年配置策略',
+                category: 'stocks',
+                categoryName: '股票市场',
+                summary: '详细分析股债相关性变化对投资组合的影响，提供基于经济周期的动态配置建议。',
+                date: '2025-11-18',
+                author: '首席策略师 王刚',
+                views: 856
+            },
+            {
+                id: 3,
+                title: '美元强势周期中的新兴市场机遇',
+                category: 'forex',
+                categoryName: '外汇/货币',
+                summary: '深入探讨美元升值对新兴市场汇率和资本流动的影响，挖掘投资机会。',
+                date: '2025-11-17',
+                author: '国际研究团队',
+                views: 654
+            },
+            {
+                id: 4,
+                title: '原油供需格局变化与地缘政治风险',
+                category: 'energy',
+                categoryName: '能源/大宗商品',
+                summary: '跟踪全球原油库存、OPEC+ 决议对油价的影响，评估未来价格走势。',
+                date: '2025-11-16',
+                author: '商品分析师 赵敏',
+                views: 432
+            }
+        ];
+    
+        // --- 新增 AI 聊天组件 ---
+        const AIChatAssistant = () => {
+            const [prompt, setPrompt] = useState('');
+            const [response, setResponse] = useState('欢迎使用金融 AI 助手！请输入你的问题，例如：“美联储降息对黄金价格有什么影响？”');
+            const [isLoading, setIsLoading] = useState(false);
+    
+            const handleAskAI = async () => {
+                if (!prompt.trim() || isLoading) return;
+    
+                setIsLoading(true);
+                setResponse('AI 正在思考中... ⏳');
+    
+                try {
+                    const fetchResponse = await fetch(WORKER_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ prompt: prompt })
+                    });
+    
+                    if (!fetchResponse.ok) {
+                        throw new Error(`Worker 返回 HTTP 错误! 状态码: ${fetchResponse.status}`);
+                    }
+    
+                    const data = await fetchResponse.json();
+                    
+                    // 解析 Gemini 返回的 JSON 结构
+                    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+                        const aiText = data.candidates[0].content.parts[0].text;
+                        setResponse(aiText);
+                    } else if (data.error) {
+                         setResponse("Worker 内部错误或 Google API 错误: " + JSON.stringify(data.error.message || data.error));
+                    } else {
+                        setResponse("AI 没有返回有效内容，请检查浏览器控制台日志。");
+                        console.error("完整的 API 响应:", data);
+                    }
+    
+                } catch (error) {
+                    setResponse("连接错误: " + error.message);
+                    console.error(error);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+    
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAskAI();
+                }
+            };
+    
+            return (
+                <div className="max-w-7xl mx-auto px-4 pt-8 pb-16">
+                    <div className="bg-white rounded-xl shadow-lg border border-blue-100 p-6 lg:p-8">
+                        <h3 className="text-2xl font-bold text-blue-600 mb-4 flex items-center gap-2">
+                            <Bot className="w-6 h-6" />
+                            金融 AI 智能助手
+                        </h3>
+                        <p className="text-sm text-slate-500 mb-6">
+                            基于最新的金融数据和报告，获取即时的市场分析和总结。
+                        </p>
+    
+                        <div className="mb-6">
+                            <textarea
+                                id="promptInput"
+                                value={prompt}
+                                onChange={(e) => setPrompt(e.target.value)}
+                                onKeyPress={handleKeyPress}
+                                rows="4"
+                                placeholder="请输入你的金融问题（Shift + Enter 换行，Enter 键发送）"
+                                className="w-full p-3 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
+                                disabled={isLoading}
+                            />
+                            <button
+                                onClick={handleAskAI}
+                                disabled={isLoading}
+                                className={`mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold transition-colors ${
+                                    isLoading 
+                                        ? 'bg-blue-400 text-white cursor-not-allowed' 
+                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                            >
+                                {isLoading ? '正在分析...' : '发送请求'}
+                                {!isLoading && <Send className="w-5 h-5" />}
+                            </button>
+                        </div>
+    
+                        <div className="mt-4 border-t border-slate-100 pt-4">
+                            <h4 className="text-lg font-semibold text-slate-800 mb-2">
+                                AI 分析结果：
+                            </h4>
+                            <div className="bg-blue-50 text-slate-700 p-4 rounded-lg whitespace-pre-wrap">
+                                {response}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // --- 导航组件 (略，保持不变) ---
+        const Navigation = ({ activeTab, setActiveTab, isMenuOpen, setIsMenuOpen }) => (
+            <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-slate-200">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between items-center h-16">
+                        <div className="flex items-center gap-2">
+                            <BarChart3 className="w-6 h-6 text-blue-600" />
+                            <span className="text-xl font-bold text-slate-900">Alpha Research</span>
+                        </div>
+                        
+                        <div className="hidden md:flex items-center gap-8">
+                            {['all', 'gold', 'stocks', 'forex', 'energy', 'ai', 'about'].map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`font-medium transition-colors ${
+                                        activeTab === tab 
+                                            ? 'text-blue-600 border-b-2 border-blue-600' 
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    {tab === 'all' ? '全部' : tab === 'gold' ? '黄金' : tab === 'stocks' ? '股票' : tab === 'forex' ? '外汇' : tab === 'energy' ? '能源' : tab === 'ai' ? 'AI助手' : '关于'}
+                                </button>
+                            ))}
+                        </div>
+    
+                        <button 
+                            onClick={() => setIsMenuOpen(!isMenuOpen)}
+                            className="md:hidden p-2 hover:bg-slate-100 rounded-lg"
+                        >
+                            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                        </button>
+                    </div>
+    
+                    {isMenuOpen && (
+                        <div className="md:hidden pb-4 flex flex-col gap-3">
+                            {['all', 'gold', 'stocks', 'forex', 'energy', 'ai', 'about'].map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => {
+                                        setActiveTab(tab);
+                                        setIsMenuOpen(false);
+                                    }}
+                                    className="text-left text-slate-600 hover:text-slate-900 font-medium"
+                                >
+                                    {tab === 'all' ? '全部' : tab === 'gold' ? '黄金' : tab === 'stocks' ? '股票' : tab === 'forex' ? '外汇' : tab === 'energy' ? '能源' : tab === 'ai' ? 'AI助手' : '关于'}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </nav>
+        );
+    
+        // --- 行情滚动条组件 (略，保持不变) ---
+        const Ticker = () => (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 py-3 border-b border-slate-200">
+                <div className="max-w-7xl mx-auto px-4">
+                    <div className="flex items-center gap-4">
+                        <span className="text-sm font-bold text-slate-700 whitespace-nowrap">实时行情</span>
+                        <div className="flex-1 overflow-hidden">
+                            <div className="animate-marquee flex gap-8">
+                                {[...marketData, ...marketData].map((data, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 whitespace-nowrap">
+                                        <span className="text-sm font-medium text-slate-700">{data.name}</span>
+                                        <span className="text-sm font-bold text-slate-900">{data.value}</span>
+                                        <span className={`text-sm font-bold ${data.isUp ? 'text-red-600' : 'text-green-600'}`}>
+                                            {data.change}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    
+        // --- 英雄区域 (修改: 添加本地服务提示) ---
+        const Hero = () => {
+            const [showModal, setShowModal] = useState(false);
+
+            const handleStartResearch = () => {
+                setShowModal(true);
+            };
+
+            const openLocalServer = () => {
+                window.open('http://localhost:3000/', '_blank');
+            };
+
+            return (
+                <>
+                    <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white py-20 px-4">
+                        <div className="max-w-7xl mx-auto text-center">
+                            <div className="flex justify-center mb-6">
+                                <Globe className="w-16 h-16" />
+                            </div>
+                            <h1 className="text-5xl md:text-6xl font-bold mb-6">Alpha Research</h1>
+                            <p className="text-xl md:text-2xl text-blue-100 mb-8 max-w-2xl mx-auto">
+                                全球金融资产深度研究平台 · 专业投资决策支持
+                            </p>
+                            <div className="flex gap-4 justify-center flex-wrap">
+                                <button
+                                    onClick={handleStartResearch}
+                                    className="bg-white text-blue-600 px-8 py-3 rounded-lg font-bold hover:bg-blue-50 transition-colors"
+                                >
+                                    开始研究
+                                </button>
+                                <button className="border-2 border-white text-white px-8 py-3 rounded-lg font-bold hover:bg-white hover:text-blue-600 transition-colors">
+                                    了解更多
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 提示模态框 */}
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+                                <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                    <BarChart3 className="w-6 h-6 text-blue-600" />
+                                    启动投研平台
+                                </h3>
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                                    <p className="text-amber-800 text-sm">
+                                        <strong>提示：</strong>投研平台运行在本地服务器上，请确保已启动本地服务。
+                                    </p>
+                                </div>
+                                <div className="bg-slate-100 rounded-lg p-4 mb-4">
+                                    <p className="text-sm text-slate-600 mb-2">启动方式：</p>
+                                    <code className="text-xs bg-slate-200 px-2 py-1 rounded">
+                                        cd BS投研平台1/--main && npm run dev
+                                    </code>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={openLocalServer}
+                                        className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors"
+                                    >
+                                        打开投研平台
+                                    </button>
+                                    <button
+                                        onClick={() => setShowModal(false)}
+                                        className="px-6 py-3 border border-slate-300 rounded-lg font-medium hover:bg-slate-50 transition-colors"
+                                    >
+                                        关闭
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
+            );
+        };
+    
+        // --- 研究报告卡片 (略，保持不变) ---
+        const ReportCard = ({ report }) => (
+            <div className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 border border-slate-100 flex flex-col">
+                <div className="flex items-start justify-between mb-3">
+                    <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full">
+                        {report.categoryName}
+                    </span>
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-3 line-clamp-2 flex-1">
+                    {report.title}
+                </h3>
+                <p className="text-slate-600 text-sm mb-4 line-clamp-3">
+                    {report.summary}
+                </p>
+                <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 pt-3">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{report.date}</span>
+                        </div>
+                        <span>{report.author}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <TrendingUp className="w-4 h-4" />
+                        <span>{report.views}</span>
+                    </div>
+                </div>
+            </div>
+        );
+    
+        // --- 内容区域 (修改: 添加 AI 助手和新的 AI tab 逻辑) ---
+        const ContentSection = ({ activeTab }) => {
+            if (activeTab === 'ai') {
+                // 如果用户选择了 AI 助手标签，则只显示 AI 聊天组件
+                return <AIChatAssistant />;
+            }
+    
+            const filteredReports = activeTab === 'all' 
+                ? researchReports 
+                : researchReports.filter(r => r.category === activeTab);
+    
+            return (
+                <div className="max-w-7xl mx-auto px-4 py-16">
+                    <div className="mb-12">
+                        <h2 className="text-4xl font-bold text-slate-900 mb-4">
+                            {activeTab === 'all' ? '最新研究报告' : `${researchReports.find(r => r.category === activeTab)?.categoryName || ''} 研究报告`}
+                        </h2>
+                        <p className="text-lg text-slate-600">
+                            获取专业的金融市场分析和投资建议
+                        </p>
+                    </div>
+    
+                    {filteredReports.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredReports.map(report => (
+                                <ReportCard key={report.id} report={report} />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-12">
+                            <p className="text-xl text-slate-500">暂无该分类的研究报告</p>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+    
+        // --- 关于我们 (略，保持不变) ---
+        const AboutSection = () => (
+            <div className="max-w-7xl mx-auto px-4 py-16">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <h2 className="text-4xl font-bold text-slate-900 mb-6">关于 Alpha Research</h2>
+                        <p className="text-lg text-slate-600 mb-4">
+                            Alpha Research 是一个专业的金融资产研究平台，致力于为全球投资者提供深入的市场分析和投资建议。
+                        </p>
+                        <p className="text-lg text-slate-600 mb-4">
+                            我们的团队由资深金融分析师组成，覆盖全球主要金融市场，包括股票、外汇、商品和加密资产。
+                        </p>
+                        <div className="flex gap-4 mt-8">
+                            <button className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors">
+                                联系我们
+                            </button>
+                        </div>
+                    </div>
+                    <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg p-8 text-center">
+                        <div className="bg-white rounded-lg shadow-lg p-8 inline-block">
+                            <TrendingUp className="w-16 h-16 text-blue-600 mx-auto mb-4" />
+                            <p className="text-sm text-slate-600">专业分析团队</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    
+        // --- 页脚 (略，保持不变) ---
+        const Footer = () => (
+            <footer className="bg-slate-900 text-white py-12 px-4">
+                <div className="max-w-7xl mx-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+                        <div>
+                            <h3 className="font-bold mb-4 flex items-center gap-2">
+                                <BarChart3 className="w-5 h-5" />
+                                Alpha Research
+                            </h3>
+                            <p className="text-slate-400 text-sm">专业的金融资产研究平台</p>
+                        </div>
+                        <div>
+                            <h4 className="font-bold mb-4">产品</h4>
+                            <ul className="space-y-2 text-sm text-slate-400">
+                                <li><a href="#" className="hover:text-white transition-colors">研究报告</a></li>
+                                <li><a href="#" className="hover:text-white transition-colors">市场数据</a></li>
+                                <li><a href="#" className="hover:text-white transition-colors">分析工具</a></li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="font-bold mb-4">资源</h4>
+                            <ul className="space-y-2 text-sm text-slate-400">
+                                <li><a href="#" className="hover:text-white transition-colors">博客</a></li>
+                                <li><a href="#" className="hover:text-white transition-colors">文档</a></li>
+                                <li><a href="#" className="hover:text-white transition-colors">常见问题</a></li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="font-bold mb-4">联系我们</h4>
+                            <ul className="space-y-2 text-sm text-slate-400">
+                                <li className="flex items-center gap-2">
+                                    <Mail className="w-4 h-4" />
+                                    <a href="mailto:info@alpharesearch.com" className="hover:text-white transition-colors">info@alpharesearch.com</a>
+                                </li>
+                                <li className="flex items-center gap-2 mt-2">
+                                    <Linkedin className="w-4 h-4" />
+                                    <a href="#" className="hover:text-white transition-colors">LinkedIn</a>
+                                </li>
+                                <li className="flex items-center gap-2 mt-2">
+                                    <Twitter className="w-4 h-4" />
+                                    <a href="#" className="hover:text-white transition-colors">Twitter</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div className="border-t border-slate-800 pt-8 text-center text-sm text-slate-400">
+                        <p>&copy; 2025 Alpha Research. All rights reserved.</p>
+                    </div>
+                </div>
+            </footer>
+        );
+    
+        // --- 主应用组件 (修改: 增加 'ai' 标签的路由逻辑) ---
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('all');
+            const [isMenuOpen, setIsMenuOpen] = useState(false);
+    
+            useEffect(() => {
+                window.scrollTo(0, 0);
+            }, [activeTab]);
+    
+            // 导航栏新增 'ai' 标签，并处理相应的内容切换逻辑
+            return (
+                <div className="min-h-screen bg-white font-sans text-slate-900">
+                    <Navigation 
+                        activeTab={activeTab} 
+                        setActiveTab={setActiveTab} 
+                        isMenuOpen={isMenuOpen}
+                        setIsMenuOpen={setIsMenuOpen}
+                    />
+                    
+                    <Ticker />
+    
+                    {activeTab === 'about' ? (
+                        <AboutSection />
+                    ) : (
+                        <>
+                            {/* 仅在 'all' 标签显示 Hero 区域 */}
+                            {activeTab === 'all' && <Hero />}
+                            
+                            {/* 在 'all', 'gold', 'stocks', 'forex', 'energy', 'ai' 标签显示内容区域 */}
+                            <ContentSection activeTab={activeTab} />
+                        </>
+                    )}
+    
+                    <Footer />
+                </div>
+            );
+        };
+    
+        // 使用React 18的createRoot API
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
