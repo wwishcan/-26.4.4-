@@ -1,0 +1,22 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# 数据库文件（太大不上传）
+*.db
+
+# 上传文件目录
+uploads/
+
+# 构建缓存
+.vite/
+
+# 敏感凭证文件
+*.env
+credentials*.txt
+credentials*.env
