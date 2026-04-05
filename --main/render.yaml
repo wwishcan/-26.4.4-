@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: quant-platform
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: USE_CLOUD_DB
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
